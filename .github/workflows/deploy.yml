@@ -1,4 +1,6 @@
 name: Deploy to GitHub Pages
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   push:
@@ -28,7 +30,7 @@ jobs:
       - name: Build app
         run: gleam run -m lustre/dev build --minify --outdir=dist
       - name: Update script's src
-        run: sed -i 's|/random_recipe.js|/andriishupta/random_recipe.js|' dist/index.html
+        run: sed -i 's|/random_recipe.js|./random_recipe.js|' dist/index.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

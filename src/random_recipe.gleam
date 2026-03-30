@@ -7,6 +7,7 @@ import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
+import lustre/element/svg
 import lustre/event
 
 import rsvp
@@ -291,13 +292,14 @@ fn view(model: Model) -> Element(Msg) {
             html.button(
               [
                 attribute.class(
-                  "inline-flex items-center justify-center rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-stone-50 transition disabled:cursor-wait disabled:opacity-60",
+                  "inline-flex items-center justify-center gap-2 rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-stone-50 transition disabled:cursor-wait disabled:opacity-60",
                 ),
                 event.on_click(UserClickedGetRandomRecipe),
                 attribute.disabled(is_loading(model.recipe_state)),
                 attribute.aria_busy(is_loading(model.recipe_state)),
               ],
               [
+                repeat_icon("h-4 w-4"),
                 html.text(case is_loading(model.recipe_state) {
                   True -> "Loading..."
                   False -> "Get random recipe"
@@ -421,10 +423,10 @@ fn recipe_content(
                     html.div(
                       [
                         attribute.class(
-                          "flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 text-lg text-stone-50 shadow-lg shadow-stone-950/15 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1",
+                          "flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 text-lg text-stone-50 shadow-lg shadow-stone-950/15 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5",
                         ),
                       ],
-                      [html.text("->")],
+                      [arrow_right_icon("h-5 w-5")],
                     ),
                   ],
                 ),
@@ -438,7 +440,7 @@ fn recipe_content(
             event.on_click(UserClickedHideRecipeDetails),
             attribute.aria_label("Hide recipe details"),
           ],
-          [html.text("x")],
+          [x_icon("h-5 w-5")],
         ),
       ])
 
@@ -499,7 +501,7 @@ fn recipe_card_button_class(show_recipe_details: Bool) -> String {
     True ->
       "group relative block h-screen w-full cursor-default overflow-hidden text-left outline-none transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
     False ->
-      "group relative mx-auto block w-full cursor-pointer text-left outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-2"
+      "group relative mx-auto block w-full cursor-pointer text-left outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5"
   }
 }
 
@@ -508,7 +510,7 @@ fn recipe_card_surface_class(show_recipe_details: Bool) -> String {
     True ->
       "relative flex h-screen w-full overflow-hidden bg-stone-100 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
     False ->
-      "relative w-full overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.08)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:shadow-[0_32px_100px_rgba(28,25,23,0.14)]"
+      "relative w-full overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.08)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:shadow-[0_26px_84px_rgba(28,25,23,0.09)]"
   }
 }
 
@@ -557,4 +559,43 @@ fn close_button_class(show_recipe_details: Bool) -> String {
     False ->
       "pointer-events-none absolute left-7 top-7 z-40 h-0 w-0 overflow-hidden opacity-0"
   }
+}
+
+fn icon_base(class_name: String, children: List(Element(msg))) -> Element(msg) {
+  html.svg(
+    [
+      attribute.class(class_name),
+      attribute.attribute("viewBox", "0 0 24 24"),
+      attribute.attribute("fill", "none"),
+      attribute.attribute("stroke", "currentColor"),
+      attribute.attribute("stroke-width", "2"),
+      attribute.attribute("stroke-linecap", "round"),
+      attribute.attribute("stroke-linejoin", "round"),
+      attribute.attribute("aria-hidden", "true"),
+    ],
+    children,
+  )
+}
+
+fn repeat_icon(class_name: String) -> Element(msg) {
+  icon_base(class_name, [
+    svg.path([attribute.attribute("d", "m17 2 4 4-4 4")]),
+    svg.path([attribute.attribute("d", "M3 11v-1a4 4 0 0 1 4-4h14")]),
+    svg.path([attribute.attribute("d", "m7 22-4-4 4-4")]),
+    svg.path([attribute.attribute("d", "M21 13v1a4 4 0 0 1-4 4H3")]),
+  ])
+}
+
+fn arrow_right_icon(class_name: String) -> Element(msg) {
+  icon_base(class_name, [
+    svg.path([attribute.attribute("d", "M5 12h14")]),
+    svg.path([attribute.attribute("d", "m12 5 7 7-7 7")]),
+  ])
+}
+
+fn x_icon(class_name: String) -> Element(msg) {
+  icon_base(class_name, [
+    svg.path([attribute.attribute("d", "M18 6 6 18")]),
+    svg.path([attribute.attribute("d", "m6 6 12 12")]),
+  ])
 }

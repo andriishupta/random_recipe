@@ -11,9 +11,6 @@ import lustre/event
 
 import rsvp
 
-@external(javascript, "./random_recipe_ffi.mjs", "start_view_transition")
-fn start_view_transition(with callback: fn() -> Nil) -> Nil
-
 pub fn main() {
   let app = lustre.application(init, update, view)
   let assert Ok(_) = lustre.start(app, "#app", Nil)
@@ -200,6 +197,9 @@ fn delay_message(delay_ms: Int, message: Msg) -> Effect(Msg) {
     Nil
   })
 }
+
+@external(javascript, "./random_recipe_ffi.mjs", "start_view_transition")
+fn start_view_transition(with callback: fn() -> Nil) -> Nil
 
 fn run_view_transition(message: Msg) -> Effect(Msg) {
   effect.from(fn(dispatch) {

@@ -11,6 +11,9 @@ import lustre/event
 
 import rsvp
 
+@external(javascript, "./random_recipe_ffi.mjs", "start_view_transition")
+fn start_view_transition(with callback: fn() -> Nil) -> Nil
+
 pub fn main() {
   let app = lustre.application(init, update, view)
   let assert Ok(_) = lustre.start(app, "#app", Nil)
@@ -57,8 +60,10 @@ fn init(_args) -> #(Model, Effect(Msg)) {
 
 type Msg {
   UserClickedGetRandomRecipe
-  UserClickedOpenRecipeDetails
-  UserClickedCloseRecipeDetails
+  UserClickedShowRecipeDetails
+  UserClickedHideRecipeDetails
+  AppStartedShowingRecipeDetails
+  AppStartedHidingRecipeDetails
   AppPlaceholderDelayElapsed
   AppPlaceholderMinimumElapsed
   ApiReturnedRecipe(Result(Recipe, rsvp.Error))
@@ -72,12 +77,24 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         False -> start_recipe_request(model)
       }
 
-    UserClickedOpenRecipeDetails -> #(
+    UserClickedShowRecipeDetails ->
+      case model.show_recipe_details {
+        True -> #(model, effect.none())
+        False -> #(model, run_view_transition(AppStartedShowingRecipeDetails))
+      }
+
+    UserClickedHideRecipeDetails ->
+      case model.show_recipe_details {
+        True -> #(model, run_view_transition(AppStartedHidingRecipeDetails))
+        False -> #(model, effect.none())
+      }
+
+    AppStartedShowingRecipeDetails -> #(
       Model(..model, show_recipe_details: True),
       effect.none(),
     )
 
-    UserClickedCloseRecipeDetails -> #(
+    AppStartedHidingRecipeDetails -> #(
       Model(..model, show_recipe_details: False),
       effect.none(),
     )
@@ -184,6 +201,17 @@ fn delay_message(delay_ms: Int, message: Msg) -> Effect(Msg) {
   })
 }
 
+fn run_view_transition(message: Msg) -> Effect(Msg) {
+  effect.from(fn(dispatch) {
+    start_view_transition(fn() {
+      dispatch(message)
+      Nil
+    })
+
+    Nil
+  })
+}
+
 fn get_random_recipe() -> Effect(Msg) {
   let recipe_decoder = {
     use id <- decode.field("idMeal", decode.string)
@@ -237,9 +265,11 @@ fn get_random_recipe() -> Effect(Msg) {
 }
 
 fn view(model: Model) -> Element(Msg) {
+  let is_showing_details = model.show_recipe_details
+
   let recipe_element = case model.recipe_state {
-    Showing(view_state) -> recipe_content(view_state)
-    Loading(option.Some(current)) -> recipe_content(current)
+    Showing(view_state) -> recipe_content(view_state, is_showing_details)
+    Loading(option.Some(current)) -> recipe_content(current, is_showing_details)
     PlaceholderLocked(_, _) -> recipe_placeholder()
     PlaceholderReady(_) -> recipe_placeholder()
     Loading(option.None) | Empty -> recipe_placeholder()
@@ -247,14 +277,14 @@ fn view(model: Model) -> Element(Msg) {
 
   html.div(
     [
-      attribute.class("min-h-screen bg-stone-100 px-6 py-10 text-stone-900"),
+      attribute.class(
+        "min-h-screen overflow-x-hidden bg-stone-100 px-6 py-10 text-stone-900",
+      ),
     ],
     [
       html.div(
         [
-          attribute.class(
-            "mx-auto flex min-h-[calc(100vh-5rem)] max-w-md flex-col items-center justify-center gap-6",
-          ),
+          attribute.class(app_shell_class(model.show_recipe_details)),
         ],
         [
           html.div([], [
@@ -282,52 +312,135 @@ fn view(model: Model) -> Element(Msg) {
   )
 }
 
-fn recipe_content(view_state: RecipeViewState) -> Element(Msg) {
+fn recipe_content(
+  view_state: RecipeViewState,
+  show_recipe_details: Bool,
+) -> Element(Msg) {
   case view_state {
     RecipeLoaded(recipe) ->
-      html.div(
-        [
-          attribute.class(
-            "w-full overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.08)]",
-          ),
-        ],
-        [
-          html.div(
-            [
-              attribute.class(
-                "aspect-square w-full overflow-hidden bg-stone-200",
-              ),
-            ],
-            [
-              html.img([
-                attribute.class("h-full w-full object-cover"),
-                attribute.src(option.unwrap(recipe.thumbnail_url, "")),
-                attribute.alt(recipe.name),
-                attribute.width(400),
-                attribute.height(400),
-              ]),
-            ],
-          ),
-          html.div([attribute.class("flex flex-col gap-3 p-6")], [
-            html.p(
+      html.div([attribute.class(recipe_frame_class(show_recipe_details))], [
+        html.button(
+          [
+            attribute.class(recipe_card_button_class(show_recipe_details)),
+            event.on_click(UserClickedShowRecipeDetails),
+            attribute.aria_label("Show recipe details"),
+          ],
+          [
+            html.div(
               [
-                attribute.class(
-                  "text-xs font-semibold uppercase tracking-[0.24em] text-stone-500",
+                attribute.class(recipe_card_surface_class(show_recipe_details)),
+                attribute.style("view-transition-name", "recipe-card"),
+              ],
+              [
+                html.div(
+                  [
+                    attribute.class(recipe_media_wrap_class(show_recipe_details)),
+                  ],
+                  [
+                    html.div(
+                      [
+                        attribute.class(recipe_media_class(show_recipe_details)),
+                        attribute.style("view-transition-name", "recipe-image"),
+                      ],
+                      [
+                        html.img([
+                          attribute.class("h-full w-full object-cover"),
+                          attribute.src(option.unwrap(recipe.thumbnail_url, "")),
+                          attribute.alt(recipe.name),
+                          attribute.width(400),
+                          attribute.height(400),
+                        ]),
+                      ],
+                    ),
+                    html.div(
+                      [
+                        attribute.class(recipe_summary_class(
+                          show_recipe_details,
+                        )),
+                      ],
+                      [
+                        html.p(
+                          [
+                            attribute.class(
+                              "text-xs font-semibold uppercase tracking-[0.24em] text-stone-500",
+                            ),
+                          ],
+                          [
+                            html.text(option.unwrap(recipe.category, "Category")),
+                          ],
+                        ),
+                        html.h1(
+                          [
+                            attribute.class(
+                              "max-w-xl text-3xl font-semibold leading-tight text-stone-950 sm:text-4xl",
+                            ),
+                            attribute.style(
+                              "view-transition-name",
+                              "recipe-title",
+                            ),
+                          ],
+                          [html.text(recipe.name)],
+                        ),
+                        html.div(
+                          [
+                            attribute.class(details_panel_class(
+                              show_recipe_details,
+                            )),
+                          ],
+                          [
+                            html.p(
+                              [
+                                attribute.class(
+                                  "text-xs font-semibold uppercase tracking-[0.24em] text-stone-400",
+                                ),
+                              ],
+                              [html.text("Description")],
+                            ),
+                            html.p(
+                              [
+                                attribute.class(
+                                  "max-w-prose overflow-y-auto pr-2 text-sm leading-7 text-stone-600 sm:text-base",
+                                ),
+                              ],
+                              [
+                                html.text(option.unwrap(
+                                  recipe.instructions,
+                                  "No description yet.",
+                                )),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                html.div(
+                  [attribute.class(arrow_wrap_class(show_recipe_details))],
+                  [
+                    html.div(
+                      [
+                        attribute.class(
+                          "flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 text-lg text-stone-50 shadow-lg shadow-stone-950/15 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1",
+                        ),
+                      ],
+                      [html.text("->")],
+                    ),
+                  ],
                 ),
               ],
-              [html.text(option.unwrap(recipe.category, "Category"))],
             ),
-            html.h1(
-              [
-                attribute.class(
-                  "text-3xl font-semibold leading-tight text-stone-950",
-                ),
-              ],
-              [html.text(recipe.name)],
-            ),
-          ]),
-        ],
-      )
+          ],
+        ),
+        html.button(
+          [
+            attribute.class(close_button_class(show_recipe_details)),
+            event.on_click(UserClickedHideRecipeDetails),
+            attribute.aria_label("Hide recipe details"),
+          ],
+          [html.text("x")],
+        ),
+      ])
 
     RecipeFailed(error) ->
       html.div(
@@ -361,4 +474,87 @@ fn recipe_placeholder() -> Element(Msg) {
       ]),
     ],
   )
+}
+
+fn app_shell_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "mx-auto flex min-h-[calc(100vh-5rem)] max-w-md flex-col items-center justify-center gap-6 transition-all duration-500 ease-out"
+    False ->
+      "mx-auto flex min-h-[calc(100vh-5rem)] max-w-md flex-col items-center justify-center gap-6 transition-all duration-500 ease-out"
+  }
+}
+
+fn recipe_frame_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "fixed inset-0 z-40 h-screen overflow-hidden bg-stone-100 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+    False ->
+      "relative w-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+  }
+}
+
+fn recipe_card_button_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "group relative block h-screen w-full cursor-default overflow-hidden text-left outline-none transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+    False ->
+      "group relative mx-auto block w-full cursor-pointer text-left outline-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-2"
+  }
+}
+
+fn recipe_card_surface_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "relative flex h-screen w-full overflow-hidden bg-stone-100 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+    False ->
+      "relative w-full overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.08)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:shadow-[0_32px_100px_rgba(28,25,23,0.14)]"
+  }
+}
+
+fn recipe_media_wrap_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "mx-auto grid h-screen w-full max-w-[1200px] grid-cols-1 items-center gap-6 px-6 py-20 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-12"
+    False -> "flex flex-col"
+  }
+}
+
+fn recipe_media_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "aspect-square w-full self-center overflow-hidden rounded-[2.5rem] bg-stone-200 shadow-[0_30px_90px_rgba(28,25,23,0.14)] transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] lg:h-[calc(100vh-10rem)] lg:max-h-[720px] lg:aspect-auto"
+    False -> "aspect-square w-full overflow-hidden bg-stone-200"
+  }
+}
+
+fn recipe_summary_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True -> "flex h-full min-h-0 flex-col justify-center gap-6 py-2 lg:py-6"
+    False -> "flex flex-col gap-3 p-6"
+  }
+}
+
+fn details_panel_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "mt-2 flex min-h-0 max-w-xl flex-1 flex-col gap-4 overflow-hidden border-t border-stone-200 pt-6 opacity-100 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+    False -> "pointer-events-none max-h-0 overflow-hidden opacity-0"
+  }
+}
+
+fn arrow_wrap_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True -> "pointer-events-none absolute bottom-6 right-6 opacity-0"
+    False -> "pointer-events-none absolute bottom-6 right-6 opacity-100"
+  }
+}
+
+fn close_button_class(show_recipe_details: Bool) -> String {
+  case show_recipe_details {
+    True ->
+      "fixed left-6 top-6 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-stone-200 bg-white text-xl font-medium text-stone-700 shadow-lg transition-all duration-300 hover:bg-stone-50"
+    False ->
+      "pointer-events-none absolute left-7 top-7 z-40 h-0 w-0 overflow-hidden opacity-0"
+  }
 }

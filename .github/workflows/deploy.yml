@@ -30,7 +30,7 @@ jobs:
       - name: Build app
         run: gleam run -m lustre/dev build --minify --outdir=dist
       - name: Update script's src
-        run: sed -i 's|/random_recipe.js|./random_recipe.js|' dist/index.html
+        run: sed -i -e 's|/random_recipe.js|./random_recipe.js|' -e 's|/random_recipe.css|./random_recipe.css|' dist/index.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

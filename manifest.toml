@@ -46,6 +46,7 @@ packages = [
 ]
 
 [requirements]
+gleam_javascript = { version = ">= 1.0.0 and < 2.0.0" }
 gleam_stdlib = { version = ">= 0.44.0 and < 2.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 lustre = { version = ">= 5.6.0 and < 6.0.0" }

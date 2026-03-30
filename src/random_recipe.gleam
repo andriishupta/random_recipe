@@ -136,8 +136,6 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
-const base_api_url = "https://www.themealdb.com/api/json/v1/1"
-
 const placeholder_delay_ms = 150
 
 const placeholder_minimum_duration_ms = 150
@@ -187,7 +185,7 @@ fn delay_message(delay_ms: Int, message: Msg) -> Effect(Msg) {
 }
 
 fn get_random_recipe() -> Effect(Msg) {
-  let meal_decoder = {
+  let recipe_decoder = {
     use id <- decode.field("idMeal", decode.string)
     use name <- decode.field("strMeal", decode.string)
     use name_alt <- decode.optional_field(
@@ -228,13 +226,14 @@ fn get_random_recipe() -> Effect(Msg) {
   }
 
   let decoder = {
-    use meal <- decode.field("meals", decode.at([0], meal_decoder))
-    decode.success(meal)
+    use recipe <- decode.field("meals", decode.at([0], recipe_decoder))
+    decode.success(recipe)
   }
 
-  let url = base_api_url <> "/random.php"
-
-  rsvp.get(url, rsvp.expect_json(decoder, ApiReturnedRecipe))
+  rsvp.get(
+    "https://www.themealdb.com/api/json/v1/1/random.php",
+    rsvp.expect_json(decoder, ApiReturnedRecipe),
+  )
 }
 
 fn view(model: Model) -> Element(Msg) {
@@ -246,101 +245,120 @@ fn view(model: Model) -> Element(Msg) {
     Loading(option.None) | Empty -> recipe_placeholder()
   }
 
-  html.div([], [
-    html.div([], [
-      html.button(
+  html.div(
+    [
+      attribute.class("min-h-screen bg-stone-100 px-6 py-10 text-stone-900"),
+    ],
+    [
+      html.div(
         [
-          event.on_click(UserClickedGetRandomRecipe),
-          attribute.disabled(is_loading(model.recipe_state)),
-          attribute.aria_busy(is_loading(model.recipe_state)),
+          attribute.class(
+            "mx-auto flex min-h-[calc(100vh-5rem)] max-w-md flex-col items-center justify-center gap-6",
+          ),
         ],
         [
-          html.text(case is_loading(model.recipe_state) {
-            True -> "Loading..."
-            False -> "Get random recipe"
-          }),
+          html.div([], [
+            html.button(
+              [
+                attribute.class(
+                  "inline-flex items-center justify-center rounded-full bg-stone-900 px-5 py-3 text-sm font-medium text-stone-50 transition disabled:cursor-wait disabled:opacity-60",
+                ),
+                event.on_click(UserClickedGetRandomRecipe),
+                attribute.disabled(is_loading(model.recipe_state)),
+                attribute.aria_busy(is_loading(model.recipe_state)),
+              ],
+              [
+                html.text(case is_loading(model.recipe_state) {
+                  True -> "Loading..."
+                  False -> "Get random recipe"
+                }),
+              ],
+            ),
+          ]),
+          html.div([attribute.class("w-full")], [recipe_element]),
         ],
       ),
-    ]),
-    html.div([], [recipe_element]),
-  ])
+    ],
+  )
 }
 
 fn recipe_content(view_state: RecipeViewState) -> Element(Msg) {
   case view_state {
     RecipeLoaded(recipe) ->
-      html.div([], [
-        html.img([
-          attribute.src(option.unwrap(recipe.thumbnail_url, "")),
-          attribute.width(400),
-          attribute.height(400),
-        ]),
-        html.p([], [html.text(recipe.name)]),
-        case recipe.instructions {
-          option.Some(instructions) -> html.p([], [html.text(instructions)])
-          option.None -> html.p([], [html.text("instructions")])
-        },
-      ])
+      html.div(
+        [
+          attribute.class(
+            "w-full overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.08)]",
+          ),
+        ],
+        [
+          html.div(
+            [
+              attribute.class(
+                "aspect-square w-full overflow-hidden bg-stone-200",
+              ),
+            ],
+            [
+              html.img([
+                attribute.class("h-full w-full object-cover"),
+                attribute.src(option.unwrap(recipe.thumbnail_url, "")),
+                attribute.alt(recipe.name),
+                attribute.width(400),
+                attribute.height(400),
+              ]),
+            ],
+          ),
+          html.div([attribute.class("flex flex-col gap-3 p-6")], [
+            html.p(
+              [
+                attribute.class(
+                  "text-xs font-semibold uppercase tracking-[0.24em] text-stone-500",
+                ),
+              ],
+              [html.text(option.unwrap(recipe.category, "Category"))],
+            ),
+            html.h1(
+              [
+                attribute.class(
+                  "text-3xl font-semibold leading-tight text-stone-950",
+                ),
+              ],
+              [html.text(recipe.name)],
+            ),
+          ]),
+        ],
+      )
 
-    RecipeFailed(error) -> html.div([], [html.text(error)])
+    RecipeFailed(error) ->
+      html.div(
+        [
+          attribute.class(
+            "w-full rounded-[2rem] border border-red-200 bg-red-50 p-6 text-sm text-red-700",
+          ),
+        ],
+        [html.text(error)],
+      )
   }
 }
 
 fn recipe_placeholder() -> Element(Msg) {
   html.div(
     [
-      attribute.style("display", "flex"),
-      attribute.style("flex-direction", "column"),
-      attribute.style("gap", "12px"),
-      attribute.style("padding", "16px"),
-      attribute.style("width", "400px"),
+      attribute.class(
+        "w-full overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.08)]",
+      ),
     ],
     [
       html.div(
         [
-          attribute.style("width", "400px"),
-          attribute.style("height", "400px"),
-          attribute.style("border-radius", "16px"),
-          attribute.style("background", "#ece7df"),
+          attribute.class("aspect-square w-full bg-stone-200"),
         ],
         [],
       ),
-      html.div(
-        [
-          attribute.style("width", "70%"),
-          attribute.style("height", "24px"),
-          attribute.style("border-radius", "999px"),
-          attribute.style("background", "#e4ddd2"),
-        ],
-        [],
-      ),
-      html.div(
-        [
-          attribute.style("width", "100%"),
-          attribute.style("height", "14px"),
-          attribute.style("border-radius", "999px"),
-          attribute.style("background", "#f1ece5"),
-        ],
-        [],
-      ),
-      html.div(
-        [
-          attribute.style("width", "92%"),
-          attribute.style("height", "14px"),
-          attribute.style("border-radius", "999px"),
-          attribute.style("background", "#f1ece5"),
-        ],
-        [],
-      ),
-      html.div(
-        [
-          attribute.style("width", "84%"),
-          attribute.style("height", "14px"),
-          attribute.style("border-radius", "999px"),
-          attribute.style("background", "#f1ece5"),
-        ],
-        [],
-      ),
+      html.div([attribute.class("flex flex-col gap-3 p-6")], [
+        html.div([attribute.class("h-3 w-28 rounded-full bg-stone-200")], []),
+        html.div([attribute.class("h-10 w-3/4 rounded-2xl bg-stone-200")], []),
+      ]),
     ],
   )
 }
